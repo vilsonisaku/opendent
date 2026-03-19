@@ -331,10 +331,14 @@ ipcMain.handle('setup:getNetworkInfo', () => {
 });
 
 app.whenReady().then(async () => {
+  console.log('[Boot] Config path:', getConfigPath());
   const config = loadConfig();
   if (!config) {
-    // First launch — show setup wizard
-    createSetupWindow();
+    // No config — default to server mode (works out of the box)
+    console.log('[Boot] No config found, defaulting to server mode');
+    initDB();
+    try { await startServer(db, 3747, ''); } catch(e) { console.error('Server start failed:', e); }
+    createWindow({ mode: 'server', port: 3747 });
   } else if (config.mode === 'server') {
     // Server mode — init DB and start API server
     initDB();
