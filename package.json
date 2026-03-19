@@ -1,0 +1,71 @@
+{
+    "name": "dental-pro",
+    "version": "2.4.0",
+    "description": "Dental Practice Management Software",
+    "main": "Main.js",
+    "scripts": {
+      "start": "electron .",
+      "dev": "electron . --dev",
+      "rebuild": "electron-rebuild --force",
+      "build:win": "electron-builder --win --x64",
+      "build:mac": "electron-builder --mac"
+    },
+    "dependencies": {
+      "better-sqlite3": "^9.4.3",
+      "express": "^4.18.2",
+      "cors": "^2.8.5"
+    },
+    "devDependencies": {
+      "electron": "^29.0.0",
+      "electron-builder": "^24.13.3",
+      "@electron/rebuild": "^3.6.0"
+    },
+    "author": "DentalPro",
+    "license": "MIT",
+    "build": {
+      "appId": "com.dentalpro.app",
+      "productName": "DentalPro",
+      "files": [
+        "Main.js",
+        "app.js",
+        "preload.js",
+        "preload-client.js",
+        "preload-setup.js",
+        "server.js",
+        "client-api.js",
+        "index.html",
+        "setup.html",
+        "styles.css",
+        "package.json",
+        "node_modules/**/*"
+      ],
+      "directories": {
+        "output": "dist"
+      },
+      "win": {
+        "target": [
+          {
+            "target": "nsis",
+            "arch": [
+              "x64"
+            ]
+          }
+        ]
+      },
+      "nsis": {
+        "oneClick": false,
+        "allowToChangeInstallationDirectory": true,
+        "createDesktopShortcut": true,
+        "createStartMenuShortcut": true,
+        "shortcutName": "DentalPro"
+      },
+      "npmRebuild": true,
+      "nodeGypRebuild": false,
+      "buildDependenciesFromSource": false,
+      "asarUnpack": [
+        "preload.js",
+        "preload-client.js",
+        "preload-setup.js"
+      ]
+    }
+  }
