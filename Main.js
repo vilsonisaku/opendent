@@ -317,6 +317,12 @@ ipcMain.handle('setup:saveConfig', async (_, cfg) => {
     return { mode:'client', serverUrl: cfg.serverUrl };
   }
 });
+ipcMain.handle('setup:reconfigure', () => {
+  // Delete config and relaunch setup wizard
+  try { fs.unlinkSync(getConfigPath()); } catch(e) {}
+  if (mainWindow) { mainWindow.close(); mainWindow = null; }
+  createSetupWindow();
+});
 ipcMain.handle('setup:launch', () => {
   const config = loadConfig();
   if (setupWindow) { setupWindow.close(); setupWindow = null; }
@@ -334,11 +340,9 @@ app.whenReady().then(async () => {
   console.log('[Boot] Config path:', getConfigPath());
   const config = loadConfig();
   if (!config) {
-    // No config — default to server mode (works out of the box)
-    console.log('[Boot] No config found, defaulting to server mode');
-    initDB();
-    try { await startServer(db, 3747, ''); } catch(e) { console.error('Server start failed:', e); }
-    createWindow({ mode: 'server', port: 3747 });
+    // No config — show setup wizard
+    console.log('[Boot] No config found, showing setup wizard');
+    createSetupWindow();
   } else if (config.mode === 'server') {
     // Server mode — init DB and start API server
     initDB();

@@ -37,6 +37,44 @@ function togglePassword() {
   inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
+
+// ── Connection mode indicator ─────────────────────────────────────
+async function initConnectionStatus() {
+  const badge = document.getElementById('conn-badge');
+  const wrap  = document.getElementById('connection-status');
+  if (!badge || !wrap) return;
+
+  if (typeof window.__clientConfig !== 'undefined') {
+    // Client mode — show server URL and test connection
+    wrap.style.display = 'block';
+    const url = window.__clientConfig.serverUrl;
+    badge.style.background = 'rgba(14,165,233,.15)';
+    badge.style.color = 'var(--sky2)';
+    badge.textContent = '🌐 ' + url.replace('http://','');
+    // Test connection
+    try {
+      const r = await fetch(url + '/health');
+      const d = await r.json();
+      if (d.ok) {
+        badge.style.background = 'rgba(34,197,94,.15)';
+        badge.style.color = '#4ade80';
+        badge.textContent = '🟢 Server: ' + url.replace('http://','');
+      }
+    } catch(e) {
+      badge.style.background = 'rgba(239,68,68,.15)';
+      badge.style.color = '#f87171';
+      badge.textContent = '🔴 No connection';
+      badge.title = 'Cannot reach ' + url;
+    }
+  } else {
+    // Local/server mode
+    wrap.style.display = 'block';
+    badge.style.background = 'rgba(15,41,66,.3)';
+    badge.style.color = 'rgba(255,255,255,.5)';
+    badge.textContent = '🖥️ Local Server';
+  }
+}
+
 async function tryLogin(username, password) {
   let user = null;
 
@@ -73,6 +111,7 @@ async function tryLogin(username, password) {
   $('#view-dashboard')?.classList.add('active');
   state.currentView = 'dashboard';
   updateNavCounts();
+  initConnectionStatus();
   renderView('dashboard').catch(err => console.error('Login render error:', err));
   return true;
 }
@@ -104,9 +143,18 @@ function applyRoleUI() {
     }
   }
 
-  // Show Users nav only for admins
-  const navUsers = document.getElementById('nav-users');
-  if (navUsers) navUsers.style.display = isAdmin() ? 'flex' : 'none';
+  // Show reconfigure button for admins
+  const reconfigBtn = document.getElementById('btn-reconfigure');
+  if (reconfigBtn) reconfigBtn.style.display = isAdmin() ? 'block' : 'none';
+}
+
+function reconfigure() {
+  if (!confirm('This will close the app and reopen the setup wizard.\n\nYou can switch between Server and Client mode.\n\nContinue?')) return;
+  if (window.electronAPI?.reconfigure) {
+    window.electronAPI.reconfigure();
+  } else {
+    alert('Please delete the config file and restart:\n\nWindows: %APPDATA%\\dental-pro\\dental-config.json\nMac: ~/Library/Application Support/dental-pro/dental-config.json');
+  }
 }
 
 function logout() {

@@ -137,8 +137,9 @@ contextBridge.exposeInMainWorld('__clientConfig', {
 });
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  resetSetup: () => ipcRenderer.invoke('config:reset'),
-  getConfig:  () => ipcRenderer.invoke('config:get'),
+  reconfigure: () => ipcRenderer.invoke('setup:reconfigure'),
+  resetSetup:  () => ipcRenderer.invoke('config:reset'),
+  getConfig:   () => ipcRenderer.invoke('config:get'),
 });
 
 console.log('[preload-client] API ready, connecting to:', BASE);

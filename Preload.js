@@ -86,3 +86,8 @@ contextBridge.exposeInMainWorld('api', {
     changePassword: (obj) => ipcRenderer.invoke('users:changePassword', obj),
   },
 });
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  reconfigure: () => ipcRenderer.invoke('setup:reconfigure'),
+  getConfig:   () => ipcRenderer.invoke('config:get'),
+});
