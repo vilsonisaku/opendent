@@ -24,12 +24,7 @@
     "build": {
       "appId": "com.dentalpro.app",
       "productName": "DentalPro",
-      "asar": true,
-      "asarUnpack": [
-        "node_modules/better-sqlite3/**/*",
-        "node_modules/bindings/**/*",
-        "node_modules/file-uri-to-path/**/*"
-      ],
+      "asar": false,
       "files": [
         "**/*",
         "!dist/**",
@@ -65,20 +60,6 @@
         "perMachine": false
       },
       "npmRebuild": true,
-      "nodeGypRebuild": false,
-      "extraResources": [
-        {
-          "from": "preload.js",
-          "to": "preload.js"
-        },
-        {
-          "from": "preload-setup.js",
-          "to": "preload-setup.js"
-        },
-        {
-          "from": "preload-client.js",
-          "to": "preload-client.js"
-        }
-      ]
+      "nodeGypRebuild": false
     }
   }

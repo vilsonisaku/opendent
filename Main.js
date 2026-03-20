@@ -265,9 +265,7 @@ function saveConfig(cfg) {
 // ── Setup window ──────────────────────────────────────────────────
 let setupWindow = null;
 function createSetupWindow() {
-  const setupPreload = app.isPackaged
-    ? path.join(process.resourcesPath, 'preload-setup.js')
-    : path.join(__dirname, 'preload-setup.js');
+  const setupPreload = path.join(__dirname, 'preload-setup.js');
   console.log('[Setup] preload:', setupPreload);
   setupWindow = new BrowserWindow({
     width: 640, height: 580, resizable: false,
@@ -280,16 +278,14 @@ function createSetupWindow() {
     },
     show: false, backgroundColor: '#0f2942'
   });
-  setupWindow.loadFile(path.join(app.getAppPath(), 'setup.html'));
+  setupWindow.loadFile(path.join(__dirname, 'setup.html'));
   setupWindow.once('ready-to-show', () => setupWindow.show());
 }
 
 // ── Main app window ──────────────────────────────────────────────
 function createWindow(config) {
   const isClient = config && config.mode === 'client';
-  const preloadPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'preload.js')
-    : path.join(__dirname, 'preload.js');
+  const preloadPath = path.join(__dirname, 'preload.js');
 
   // Pass config as JSON string in additionalArguments
   // This is available in preload as process.argv before any IPC
@@ -314,9 +310,9 @@ function createWindow(config) {
     show: false, backgroundColor: '#0f172a'
   });
   if (isClient) {
-    mainWindow.loadFile(path.join(app.getAppPath(), 'index.html'));
+    mainWindow.loadFile(path.join(__dirname, 'index.html'));
   } else {
-    mainWindow.loadFile(path.join(app.getAppPath(), 'index.html'));
+    mainWindow.loadFile(path.join(__dirname, 'index.html'));
   }
   mainWindow.once('ready-to-show', () => mainWindow.show());
 }
