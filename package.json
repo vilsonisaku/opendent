@@ -70,6 +70,16 @@
         "perMachine": false
       },
       "npmRebuild": true,
-      "nodeGypRebuild": false
+      "nodeGypRebuild": false,
+      "extraResources": [
+        {
+          "from": "preload.js",
+          "to": "preload.js"
+        },
+        {
+          "from": "preload-setup.js",
+          "to": "preload-setup.js"
+        }
+      ]
     }
   }

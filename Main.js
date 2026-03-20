@@ -257,7 +257,9 @@ function saveConfig(cfg) {
 // ── Setup window ──────────────────────────────────────────────────
 let setupWindow = null;
 function createSetupWindow() {
-  const setupPreload = path.join(__dirname, 'preload-setup.js');
+  const setupPreload = app.isPackaged
+    ? path.join(process.resourcesPath, 'preload-setup.js')
+    : path.join(__dirname, 'preload-setup.js');
   console.log('[Setup] preload:', setupPreload);
   setupWindow = new BrowserWindow({
     width: 640, height: 580, resizable: false,
@@ -277,7 +279,9 @@ function createSetupWindow() {
 // ── Main app window ──────────────────────────────────────────────
 function createWindow(config) {
   const isClient = config && config.mode === 'client';
-  const preloadPath = path.join(__dirname, 'preload.js');
+  const preloadPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'preload.js')
+    : path.join(__dirname, 'preload.js');
 
   // Pass config as JSON string in additionalArguments
   // This is available in preload as process.argv before any IPC
