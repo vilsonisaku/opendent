@@ -31,22 +31,17 @@
         "node_modules/file-uri-to-path/**/*"
       ],
       "files": [
-        "Main.js",
-        "app.js",
-        "preload.js",
-        "preload-client.js",
-        "preload-setup.js",
-        "server.js",
-        "client-api.js",
-        "index.html",
-        "setup.html",
-        "styles.css",
-        "package.json",
-        "node_modules/**/*",
-        "!node_modules/**/*.map",
+        "**/*",
+        "!dist/**",
+        "!.github/**",
+        "!README.md",
+        "!**/*.map",
         "!node_modules/**/test/**",
         "!node_modules/**/tests/**",
-        "!node_modules/**/.github/**"
+        "!node_modules/**/.github/**",
+        "!node_modules/**/docs/**",
+        "!node_modules/**/example/**",
+        "!node_modules/**/examples/**"
       ],
       "directories": {
         "output": "dist"
@@ -79,6 +74,10 @@
         {
           "from": "preload-setup.js",
           "to": "preload-setup.js"
+        },
+        {
+          "from": "preload-client.js",
+          "to": "preload-client.js"
         }
       ]
     }
