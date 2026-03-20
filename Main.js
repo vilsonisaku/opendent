@@ -5,6 +5,14 @@ const Database = require('better-sqlite3');
 console.log('[Main] __dirname:', __dirname);
 console.log('[Main] process.resourcesPath:', process.resourcesPath);
 
+// Helper: get the app's root directory correctly in both dev and packaged
+function getAppDir() {
+  // app.getAppPath() returns the path to app.asar in packaged builds
+  // For loadFile we need the path inside the asar which __dirname provides
+  // But electron's loadFile can load from inside asar using app.getAppPath()
+  return app.getAppPath();
+}
+
 let db;
 let mainWindow;
 
@@ -272,7 +280,7 @@ function createSetupWindow() {
     },
     show: false, backgroundColor: '#0f2942'
   });
-  setupWindow.loadFile(path.join(__dirname, 'setup.html'));
+  setupWindow.loadFile(path.join(app.getAppPath(), 'setup.html'));
   setupWindow.once('ready-to-show', () => setupWindow.show());
 }
 
@@ -306,9 +314,9 @@ function createWindow(config) {
     show: false, backgroundColor: '#0f172a'
   });
   if (isClient) {
-    mainWindow.loadFile(path.join(__dirname, 'index.html'));
+    mainWindow.loadFile(path.join(app.getAppPath(), 'index.html'));
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'index.html'));
+    mainWindow.loadFile(path.join(app.getAppPath(), 'index.html'));
   }
   mainWindow.once('ready-to-show', () => mainWindow.show());
 }
