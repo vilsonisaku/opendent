@@ -2,6 +2,9 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const Database = require('better-sqlite3');
 
+console.log('[Main] __dirname:', __dirname);
+console.log('[Main] process.resourcesPath:', process.resourcesPath);
+
 let db;
 let mainWindow;
 
@@ -254,12 +257,16 @@ function saveConfig(cfg) {
 // ── Setup window ──────────────────────────────────────────────────
 let setupWindow = null;
 function createSetupWindow() {
-  const appPath = app.getAppPath();
-  const preloadBase = app.isPackaged ? appPath.replace('app.asar', 'app.asar.unpacked') : appPath;
+  const setupPreload = path.join(__dirname, 'preload-setup.js');
+  console.log('[Setup] preload:', setupPreload);
   setupWindow = new BrowserWindow({
     width: 640, height: 580, resizable: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(preloadBase, 'preload-setup.js') },
+    webPreferences: {
+      nodeIntegration: false, contextIsolation: true,
+      preload: setupPreload,
+      webSecurity: false,
+    },
     show: false, backgroundColor: '#0f2942'
   });
   setupWindow.loadFile('setup.html');
@@ -269,21 +276,15 @@ function createSetupWindow() {
 // ── Main app window ──────────────────────────────────────────────
 function createWindow(config) {
   const isClient = config && config.mode === 'client';
-  const preloadFile = isClient ? 'preload-client.js' : 'preload.js';
+  const preloadPath = path.join(__dirname, 'preload.js');
 
-  // In packaged apps, preload files are in app.asar.unpacked/
-  // In dev, they're in the project root
-  const appPath = app.getAppPath();
-  const isPackaged = app.isPackaged;
-  const preloadBase = isPackaged
-    ? appPath.replace('app.asar', 'app.asar.unpacked')
-    : appPath;
-  const preloadPath = path.join(preloadBase, preloadFile);
+  // Pass config as JSON string in additionalArguments
+  // This is available in preload as process.argv before any IPC
+  const configJson = JSON.stringify(config || {});
 
-  console.log('[Window] Mode:', isClient ? 'CLIENT' : 'SERVER/LOCAL');
-  console.log('[Window] isPackaged:', isPackaged);
+  console.log('[Window] mode:', isClient ? 'CLIENT → ' + config?.serverUrl : 'SERVER/LOCAL');
+  console.log('[Window] __dirname:', __dirname);
   console.log('[Window] preloadPath:', preloadPath);
-  console.log('[Window] Server URL:', config?.serverUrl || '(none)');
 
   mainWindow = new BrowserWindow({
     width: 1500, height: 920, minWidth: 1200, minHeight: 700,
@@ -294,6 +295,7 @@ function createWindow(config) {
       preload: preloadPath,
       webSecurity: false,
       allowRunningInsecureContent: isClient,
+      additionalArguments: [`--dental-config=${Buffer.from(configJson).toString('base64')}`],
     },
     show: false, backgroundColor: '#0f172a'
   });
@@ -313,6 +315,32 @@ ipcMain.handle('setup:saveConfig', async (_, cfg) => {
     saveConfig({ mode:'server', port: result.port, serverKey: cfg.serverKey || '' });
     return { mode:'server', port: result.port, ips: result.ips, serverKey: cfg.serverKey };
   } else {
+    // Test connection first using Node http (no CSP)
+    const http = require('http');
+    const testUrl = cfg.serverUrl + '/health';
+    const parsed  = new URL(testUrl);
+    const ok = await new Promise((resolve) => {
+      const opts = {
+        hostname: parsed.hostname,
+        port:     parseInt(parsed.port) || 80,
+        path:     '/health',
+        method:   'GET',
+        timeout:  5000,
+        headers:  cfg.serverKey ? { 'x-server-key': cfg.serverKey } : {},
+      };
+      const req = http.request(opts, res => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+          try { resolve(JSON.parse(data).ok === true); }
+          catch(e) { resolve(false); }
+        });
+      });
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => { req.destroy(); resolve(false); });
+      req.end();
+    });
+    if (!ok) throw new Error('Cannot reach server at ' + cfg.serverUrl);
     saveConfig({ mode:'client', serverUrl: cfg.serverUrl, serverKey: cfg.serverKey || '' });
     return { mode:'client', serverUrl: cfg.serverUrl };
   }
@@ -358,6 +386,10 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) { const cfg = loadConfig(); createWindow(cfg); } });
 
+ipcMain.handle('config:saveClient', (_, { serverUrl, serverKey }) => {
+  saveConfig({ mode: 'client', serverUrl, serverKey: serverKey || '' });
+  return true;
+});
 ipcMain.handle('config:getPath', () => getConfigPath());
 ipcMain.handle('config:get',     () => loadConfig());
 ipcMain.handle('config:reset',   () => { try { require('fs').unlinkSync(getConfigPath()); return true; } catch(e) { return false; } });
@@ -366,6 +398,41 @@ ipcMain.on('config:getSync', (event) => {
   const cfg = loadConfig() || {};
   console.log('[IPC] config:getSync returning:', JSON.stringify(cfg));
   event.returnValue = cfg;
+});
+
+// ── HTTP proxy for client mode ────────────────────────────────────
+// Renderer/preload can't use Node's http directly in packaged apps
+// Main process proxies all HTTP requests to the remote server
+ipcMain.handle('http:request', (_, { method, url, body, key }) => {
+  return new Promise((resolve, reject) => {
+    const http    = require('http');
+    const parsed  = new URL(url);
+    const data    = body !== undefined ? JSON.stringify(body) : null;
+    const opts    = {
+      hostname: parsed.hostname,
+      port:     parseInt(parsed.port) || 80,
+      path:     parsed.pathname + parsed.search,
+      method,
+      timeout:  10000,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { 'x-server-key': key } : {}),
+        ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}),
+      },
+    };
+    const req = http.request(opts, res => {
+      let raw = '';
+      res.on('data', c => raw += c);
+      res.on('end', () => {
+        try { resolve(JSON.parse(raw)); }
+        catch(e) { resolve(raw); }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Request timed out')); });
+    if (data) req.write(data);
+    req.end();
+  });
 });
 
 // IPC Handlers

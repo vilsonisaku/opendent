@@ -4,6 +4,31 @@
 const $  = (s,c=document) => c.querySelector(s);
 const $$ = (s,c=document) => [...c.querySelectorAll(s)];
 
+// Guard: if window.api is not defined, preload failed — show error
+if (typeof window.api === 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.getElementById('login-overlay');
+    if (overlay) {
+      const preloadRan = typeof window.__preloadRan !== 'undefined';
+      const clientCfg = window.__clientConfig;
+      overlay.innerHTML = `
+        <div style="background:#1e293b;padding:40px;border-radius:16px;max-width:480px;text-align:center;color:#fff">
+          <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+          <div style="font-size:20px;font-weight:700;margin-bottom:10px">Connection Error</div>
+          <div style="background:#0f172a;padding:16px;border-radius:10px;font-size:12px;color:#64748b;text-align:left;margin-bottom:20px;line-height:1.8">
+            <div>Preload ran: <strong style="color:${preloadRan?'#4ade80':'#f87171'}">${preloadRan ? '✅ Yes' : '❌ No — preload.js did not execute'}</strong></div>
+            <div>window.api: <strong style="color:#f87171">❌ undefined</strong></div>
+            <div>Mode: <strong style="color:#94a3b8">${clientCfg ? 'CLIENT → ' + clientCfg.serverUrl : 'Server/Local or unknown'}</strong></div>
+          </div>
+          <button onclick="window.electronAPI?.reconfigure?.()"
+            style="background:#0ea5e9;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">
+            ⚙️ Reconfigure
+          </button>
+        </div>`;
+    }
+  });
+}
+
 const state = {
   currentView:    'dashboard',
   scheduleDate:   new Date().toISOString().split('T')[0],
@@ -78,24 +103,30 @@ async function initConnectionStatus() {
 async function tryLogin(username, password) {
   let user = null;
 
-  // Try DB login first
   try {
     user = await window.api.users.login({ username, password });
+    console.log('[login] API response:', user ? 'OK' : 'null');
   } catch(e) {
-    console.warn('DB login failed, using fallback:', e);
+    console.error('[login] API error:', e.message);
+    // Only use fallback in local/server mode
+    if (!window.__clientConfig) {
+      const FALLBACK = [
+        { id:1, username:'admin',      password:'password123', role:'admin',  provider_name:'Dr. Smith',    full_access:1, provider:{name:'Dr. Smith',   color:'#2563eb'} },
+        { id:2, username:'drjohnson',  password:'password123', role:'doctor', provider_name:'Dr. Johnson',  full_access:0, provider:{name:'Dr. Johnson', color:'#16a34a'} },
+        { id:3, username:'drwilliams', password:'password123', role:'doctor', provider_name:'Dr. Williams', full_access:0, provider:{name:'Dr. Williams',color:'#9333ea'} },
+        { id:4, username:'sarah',      password:'password123', role:'doctor', provider_name:'Sarah H.',     full_access:0, provider:{name:'Sarah H.',    color:'#0891b2'} },
+        { id:5, username:'mike',       password:'password123', role:'doctor', provider_name:'Mike H.',      full_access:0, provider:{name:'Mike H.',     color:'#d97706'} },
+      ];
+      const found = FALLBACK.find(u => u.username === username && u.password === password);
+      if (found) user = found;
+    }
   }
 
-  // Fallback to hardcoded credentials if DB not ready
-  if (!user) {
-    const FALLBACK = [
-      { id:1, username:'admin',      password:'password123', role:'admin',  provider_name:'Dr. Smith',    full_access:1, provider:{name:'Dr. Smith',   color:'#2563eb'} },
-      { id:2, username:'drjohnson',  password:'password123', role:'doctor', provider_name:'Dr. Johnson',  full_access:0, provider:{name:'Dr. Johnson', color:'#16a34a'} },
-      { id:3, username:'drwilliams', password:'password123', role:'doctor', provider_name:'Dr. Williams', full_access:0, provider:{name:'Dr. Williams',color:'#9333ea'} },
-      { id:4, username:'sarah',      password:'password123', role:'doctor', provider_name:'Sarah H.',     full_access:0, provider:{name:'Sarah H.',    color:'#0891b2'} },
-      { id:5, username:'mike',       password:'password123', role:'doctor', provider_name:'Mike H.',      full_access:0, provider:{name:'Mike H.',     color:'#d97706'} },
-    ];
-    const found = FALLBACK.find(u => u.username === username && u.password === password);
-    if (found) user = found;
+  // In client mode, show error if no user
+  if (!user && window.__clientConfig) {
+    const errEl = document.getElementById('login-error');
+    if (errEl) errEl.textContent = 'Cannot connect to server. Check your connection.';
+    return false;
   }
 
   if (!user) return false;
@@ -144,8 +175,12 @@ function applyRoleUI() {
   }
 
   // Show reconfigure button for admins
-  const reconfigBtn = document.getElementById('btn-reconfigure');
-  if (reconfigBtn) reconfigBtn.style.display = isAdmin() ? 'block' : 'none';
+  const reconfigBtn     = document.getElementById('btn-reconfigure');
+  const reconfigBtnFull = document.getElementById('btn-reconfigure-full');
+  if (reconfigBtn)     reconfigBtn.style.display     = isAdmin() ? 'block' : 'none';
+  if (reconfigBtnFull) reconfigBtnFull.style.display = isAdmin() ? 'block' : 'none';
+  // Only show server edit in client mode
+  if (reconfigBtn && !window.__clientConfig) reconfigBtn.style.display = 'none';
 }
 
 function reconfigure() {
@@ -154,6 +189,78 @@ function reconfigure() {
     window.electronAPI.reconfigure();
   } else {
     alert('Please delete the config file and restart:\n\nWindows: %APPDATA%\\dental-pro\\dental-config.json\nMac: ~/Library/Application Support/dental-pro/dental-config.json');
+  }
+}
+
+async function showEditServerModal() {
+  const cfg = window.__clientConfig || {};
+  const url = cfg.serverUrl || '';
+  // Parse existing host and port
+  let host = '', port = '3747', key = cfg.serverKey || '';
+  try {
+    const parsed = new URL(url);
+    host = parsed.hostname;
+    port = parsed.port || '3747';
+  } catch(e) {}
+
+  openModal('Server Connection', `
+    <div class="form-grid">
+      <div class="form-group full">
+        <div style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:4px;font-size:12px;color:var(--text2)">
+          Current: <strong style="font-family:var(--mono);color:var(--navy)">${url || 'Not configured'}</strong>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Server IP / Hostname *</label>
+        <input class="form-input" id="srv-edit-host" value="${host}" placeholder="e.g. 192.168.1.5"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Port *</label>
+        <input class="form-input" id="srv-edit-port" type="number" value="${port}" min="1024" max="65535"/>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Server Key (optional)</label>
+        <input class="form-input" id="srv-edit-key" value="${key}" placeholder="Leave blank if no key is set" autocomplete="off"/>
+      </div>
+      <div class="form-actions full">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveServerCredentials()">Save & Reconnect</button>
+      </div>
+    </div>`);
+}
+
+async function saveServerCredentials() {
+  const host = document.getElementById('srv-edit-host')?.value.trim();
+  const port = document.getElementById('srv-edit-port')?.value.trim() || '3747';
+  const key  = document.getElementById('srv-edit-key')?.value.trim() || '';
+
+  if (!host) { toast('Server address is required', 'error'); return; }
+
+  const serverUrl = `http://${host}:${port}`;
+
+  // Test connection first
+  const btn = document.querySelector('#modal-body .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Testing...'; }
+
+  try {
+    const result = await window.api.users.login({ username: '__health_check__', password: '' }).catch(() => null);
+    // Even if login fails (wrong credentials), if we got a response the server is reachable
+  } catch(e) {}
+
+  // Save via IPC
+  try {
+    if (window.electronAPI?.saveClientConfig) {
+      await window.electronAPI.saveClientConfig({ serverUrl, serverKey: key });
+    } else {
+      // Fallback: use reconfigure IPC
+      await window.electronAPI?.saveConfig?.({ mode: 'client', serverUrl, serverKey: key });
+    }
+    closeModal();
+    toast('Server credentials updated — restarting...', 'success');
+    setTimeout(() => { if (window.electronAPI?.reconfigure) window.electronAPI.reconfigure(); }, 1500);
+  } catch(e) {
+    toast('Failed to save: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Save & Reconnect'; }
   }
 }
 

@@ -6,7 +6,6 @@
     "scripts": {
       "start": "electron .",
       "dev": "electron . --dev",
-      "rebuild": "electron-rebuild --force",
       "build:win": "electron-builder --win --x64",
       "build:mac": "electron-builder --mac"
     },
@@ -25,6 +24,12 @@
     "build": {
       "appId": "com.dentalpro.app",
       "productName": "DentalPro",
+      "asar": true,
+      "asarUnpack": [
+        "node_modules/better-sqlite3/**/*",
+        "node_modules/bindings/**/*",
+        "node_modules/file-uri-to-path/**/*"
+      ],
       "files": [
         "Main.js",
         "app.js",
@@ -37,7 +42,11 @@
         "setup.html",
         "styles.css",
         "package.json",
-        "node_modules/**/*"
+        "node_modules/**/*",
+        "!node_modules/**/*.map",
+        "!node_modules/**/test/**",
+        "!node_modules/**/tests/**",
+        "!node_modules/**/.github/**"
       ],
       "directories": {
         "output": "dist"
@@ -57,15 +66,10 @@
         "allowToChangeInstallationDirectory": true,
         "createDesktopShortcut": true,
         "createStartMenuShortcut": true,
-        "shortcutName": "DentalPro"
+        "shortcutName": "DentalPro",
+        "perMachine": false
       },
       "npmRebuild": true,
-      "nodeGypRebuild": false,
-      "buildDependenciesFromSource": false,
-      "asarUnpack": [
-        "preload.js",
-        "preload-client.js",
-        "preload-setup.js"
-      ]
+      "nodeGypRebuild": false
     }
   }
