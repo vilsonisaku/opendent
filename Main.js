@@ -266,10 +266,11 @@ function createSetupWindow() {
       nodeIntegration: false, contextIsolation: true,
       preload: setupPreload,
       webSecurity: false,
+      sandbox: false,
     },
     show: false, backgroundColor: '#0f2942'
   });
-  setupWindow.loadFile('setup.html');
+  setupWindow.loadFile(path.join(__dirname, 'setup.html'));
   setupWindow.once('ready-to-show', () => setupWindow.show());
 }
 
@@ -296,13 +297,14 @@ function createWindow(config) {
       webSecurity: false,
       allowRunningInsecureContent: isClient,
       additionalArguments: [`--dental-config=${Buffer.from(configJson).toString('base64')}`],
+      sandbox: false,
     },
     show: false, backgroundColor: '#0f172a'
   });
   if (isClient) {
-    mainWindow.loadFile('index.html');
+    mainWindow.loadFile(path.join(__dirname, 'index.html'));
   } else {
-    mainWindow.loadFile('index.html');
+    mainWindow.loadFile(path.join(__dirname, 'index.html'));
   }
   mainWindow.once('ready-to-show', () => mainWindow.show());
 }
